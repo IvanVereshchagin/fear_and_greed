@@ -1,0 +1,133 @@
+from fastapi import APIRouter, HTTPException, status, Depends  , Body
+from  database.database import get_session
+from models.user import User, UserRole
+
+from cruds import crud_user as UserService
+from cruds import crud_prediction as PredictionService
+
+from typing import List
+from pydantic import BaseModel
+import joblib 
+import numpy as np
+import datetime
+from models.prediction import MarketSentiment , PredictionHistory
+
+user_route = APIRouter(tags=['User'])
+
+class SignUpForm(BaseModel):
+    email: str
+    password: str
+    username : str 
+
+@user_route.post('/signup')
+async def signup( data : SignUpForm , session=Depends(get_session)) -> dict:
+
+    if "@" not in data.email:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail="Email must contain the '@' symbol")
+    
+    
+    if UserService.get_user_by_email(data.email, session=session) is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email is exist")
+    
+    user = User(password= data.password , username = data.username , email= data.email , balance = 0 , role =  UserRole.USER)
+    UserService.insert_user(user , session=session)
+    return {"message": "User was create"}
+
+
+@user_route.get('/all_users')
+async def get_all_users(session=Depends(get_session)) -> dict:
+    users = UserService.get_all_users(session=session)
+
+    user_dict = {"users": users}
+
+    return user_dict
+
+
+class SignInForm(BaseModel):
+    email: str
+    password: str
+
+@user_route.post('/signin')
+async def signin(data : SignInForm, session=Depends(get_session)) -> dict:
+    user = UserService.get_user_by_email(data.email, session=session)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User does not exist")
+
+    if user.password != data.password:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Wrong credentials passed")
+
+    return {"message": "User signed in successfully"}
+
+
+class PredictionInput(BaseModel):
+    feature1: float
+    feature2: float
+    feature3: float
+    feature4: float
+    feature5: float 
+
+
+
+@user_route.post('/predict')
+async def predict(user : User, prediction : PredictionInput = Body(...), session=Depends(get_session)) -> dict:
+    """
+    Эндпоинт для получения предсказаний на основе данных пользователя и данных о признаках.
+    """
+    user = UserService.get_user_by_email(user.email, session=session)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User does not exist")
+    
+    feature_array = np.array([prediction.feature1, prediction.feature2, prediction.feature3 , prediction.feature4 , prediction.feature5])
+
+    loaded_model = joblib.load("regression_model.joblib")
+
+    predicted_index = loaded_model.predict(feature_array.reshape(1, -1))[0]
+
+    if 0 <= predicted_index <= 10:
+        sentiment =  MarketSentiment.EXTREME_BEARISH
+    elif 11 <= predicted_index <= 20:
+        sentiment = MarketSentiment.RADICAL_BEARISH
+    elif 21 <= predicted_index <= 30:
+        sentiment = MarketSentiment.STRONG_BEARISH
+    elif 31 <= predicted_index <= 40:
+        sentiment = MarketSentiment.MODERATE_BEARISH
+    elif 41 <= predicted_index <= 60:
+        sentiment = MarketSentiment.NEUTRAL
+    elif 61 <= predicted_index <= 70:
+        sentiment = MarketSentiment.MODERATE_BULLISH
+    elif 71 <= predicted_index <= 80:
+        sentiment = MarketSentiment.STRONG_BULLISH
+    elif 81 <= predicted_index <= 90:
+        sentiment = MarketSentiment.RADICAL_BULLISH
+    elif 91 <= predicted_index <= 100:
+        sentiment = MarketSentiment.EXTREME_BULLISH
+    else:
+        #raise ValueError("Предсказано неверное значение")
+        sentiment = MarketSentiment.EXTREME_BULLISH
+
+    pred_hist = PredictionHistory( user_id = user.user_id , 
+                                  model_id= 1 , 
+                                  features = 'test' , 
+                                  prediction = predicted_index , 
+                                  category = sentiment ,
+                                   timestamp = datetime.datetime.now())
+
+    PredictionService.insert_prediction(pred_hist , session )
+
+    return {"user_id": user.user_id, "prediction": predicted_index }
+
+
+@user_route.post('/predictions')
+async def predictions(user : User,  session=Depends(get_session)) -> dict:
+    
+    user_get = UserService.get_user_by_email(user.email, session=session)
+    if user_get is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User does not exist")
+    
+    all_user_predictions = PredictionService.get_user_prediction( user_get.user_id , session)
+   
+
+    
+
+    return {"user_id": user.user_id, "predictions": all_user_predictions }

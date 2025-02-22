@@ -1,0 +1,16 @@
+sqlalchemy==2.0.31
+asyncpg==0.28.0
+psycopg==3.1.10
+psycopg-binary==3.1.10
+alembic==1.12.0
+pydantic==2.3.0
+pydantic-settings==2.0.3
+sqlmodel
+starlette
+fastapi
+uvicorn
+joblib
+numpy
+scikit-learn
+toml
+streamlit

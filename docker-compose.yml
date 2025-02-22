@@ -1,0 +1,96 @@
+version: "3.8"
+
+services:
+  app:
+    build: ./app
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./app/.env
+    volumes:
+      - ./app:/app
+    depends_on:
+      - db
+    networks:
+        - app_network
+
+  web-proxy:
+    image: nginx:latest  
+    ports:
+      - "81:80"
+      - "441:443"
+    depends_on:
+      - app
+    networks:
+      - app_network
+        
+  rabbitmq:
+    image: rabbitmq:3.13.1-management
+    hostname: rabbitmq
+    restart: always
+    environment:
+      - RABBITMQ_DEFAULT_USER=rmuser
+      - RABBITMQ_DEFAULT_PASS=rmpassword
+      - RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=--rabbit disk_free_limit 2147483648
+    ports:
+      - 15675:15672
+      - 5675:5672
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+    networks:
+      - app_network
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 30s
+      retries: 3
+
+  db:
+    image: postgres:16-alpine
+    env_file:
+      - ./postgres_data/.env
+    volumes:
+      - ./postgres_data/data:/var/lib/postgresql/data
+    expose: 
+      - 5432
+    environment:
+      - POSTGRES_USER=postgres 
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=sa
+    networks:
+        - app_network
+
+  ml_worker:
+    build: ./rabbitmq  
+    restart: always 
+    depends_on:
+      - rabbitmq
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_USER=rmuser
+      - RABBITMQ_PASSWORD=rmpassword
+    networks:
+      - app_network
+    deploy:
+      replicas: 1
+
+
+  streamlit:  
+    build:
+      context: .  
+      dockerfile: app/streamlit.Dockerfile  
+    ports:
+      - "8501:8501"
+    depends_on:
+      - app  
+    networks:
+      - app_network
+
+    
+networks:
+    app_network:
+      driver: bridge
+
+volumes:
+  rabbitmq:
+    driver: local
