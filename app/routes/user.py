@@ -11,27 +11,55 @@ import joblib
 import numpy as np
 import datetime
 from models.prediction import MarketSentiment , PredictionHistory
+from publisher import Publisher
+import sqlalchemy.exc as alc_errors
+from app.logging.signup_logger import logger 
+from psycopg import errors as pg_errors
+
+import time 
+from publisher import Publisher 
 
 user_route = APIRouter(tags=['User'])
 
-class SignUpForm(BaseModel):
+class SignUpForm(BaseModel): 
     email: str
     password: str
-    username : str 
+    username : str
 
 @user_route.post('/signup')
-async def signup( data : SignUpForm , session=Depends(get_session)) -> dict:
+async def signup( data : SignUpForm , session =Depends(get_session)) -> dict: 
 
     if "@" not in data.email:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                             detail="Email must contain the '@' symbol")
-    
-    
+
+
     if UserService.get_user_by_email(data.email, session=session) is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email is exist")
-    
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User is exist")
+
     user = User(password= data.password , username = data.username , email= data.email , balance = 0 , role =  UserRole.USER)
-    UserService.insert_user(user , session=session)
+
+    try:
+        UserService.insert_user(user , session=session)
+    except alc_errors.IntegrityError as e:
+        pass
+    except pg_errors.UniqueViolation as e: 
+        pass
+
+
+    # --- Logging ---
+    data = {
+
+        'password' : user.password,
+        'username' : user.username,
+        'email' : user.email, # Исправлено: было user.password, должно быть user.email
+        'role' : user.role
+
+    }
+    logger.info(f"NewUser" , extra = data )
+
+    # --- Logging ---
+
     return {"message": "User was create"}
 
 
@@ -80,6 +108,26 @@ async def predict(user : User, prediction : PredictionInput = Body(...), session
     
     feature_array = np.array([prediction.feature1, prediction.feature2, prediction.feature3 , prediction.feature4 , prediction.feature5])
 
+    task = {
+  "user": {
+    "password": user.password,
+    "user_id": user.user_id,
+    "username": user.username ,
+    "email": user.email,
+    "balance": user.balance,
+    "role": user.role
+  },
+  "prediction": {
+    "feature1": prediction.feature1,
+    "feature2": prediction.feature2,
+    "feature3": prediction.feature3,
+    "feature4": prediction.feature4,
+    "feature5": prediction.feature5
+  } }
+    
+    
+    Publisher.send_ml_task(task)
+
     loaded_model = joblib.load("regression_model.joblib")
 
     predicted_index = loaded_model.predict(feature_array.reshape(1, -1))[0]
@@ -117,17 +165,15 @@ async def predict(user : User, prediction : PredictionInput = Body(...), session
 
     return {"user_id": user.user_id, "prediction": predicted_index }
 
+class EmailForm(BaseModel): 
+    email: str
+
 
 @user_route.post('/predictions')
-async def predictions(user : User,  session=Depends(get_session)) -> dict:
+async def predictions(data : EmailForm,  session=Depends(get_session)) -> dict:
     
-    user_get = UserService.get_user_by_email(user.email, session=session)
+    user_get = UserService.get_user_by_email( data.email , session=session)
     if user_get is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User does not exist")
-    
     all_user_predictions = PredictionService.get_user_prediction( user_get.user_id , session)
-   
-
-    
-
-    return {"user_id": user.user_id, "predictions": all_user_predictions }
+    return {"email": data.email, "predictions": all_user_predictions }

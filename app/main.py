@@ -26,11 +26,13 @@ from datetime import datetime
 
 from routes.user import user_route
 from app.routes.balance import balance_route
-
+from fastapi.middleware.cors import CORSMiddleware
+from api_analytics.fastapi import Analytics 
 
 import uvicorn
 from fastapi import FastAPI
 
+from publisher import Publisher
 
 def initialize_database():
     settings = get_settings()
@@ -43,17 +45,30 @@ def initialize_database():
     user = User(password='test2' , username = 'katya', email='user@mail.ru', balance = 0 , role =  UserRole.USER)
 
     with Session(engine) as session:
-        insert_user(admin, session)
-        insert_user(user, session)
+        try:
+            insert_user(admin, session)
+            insert_user(user, session)
+        except:
+            pass
 
 app = FastAPI()
 app.include_router(user_route, prefix='/user')
 app.include_router(balance_route , prefix='/balance')
+app.add_middleware(Analytics , api_key = "268f2ff9-1819-49c3-b1f9-8cffdafde6a4")
 
+origins = ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins = origins , 
+    allow_credentials = True , 
+    allow_methods = ["*"],
+    allow_headers = ["*"]
+
+)
 
 @app.on_event("startup") 
 def on_startup():
     initialize_database()
 
 if __name__ == '__main__':
-    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8080)

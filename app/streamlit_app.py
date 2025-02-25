@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, status, Depends  , Body
 from  database.database import get_session
 from cruds import crud_user as UserService
 from database.config import get_settings
-
+import pandas as pd 
 
 FASTAPI_URL = "http://app:8080"  
 
@@ -59,7 +59,7 @@ def get_user_balance(email):
 def update_balance(email, amount):
     """Пополняет баланс пользователя через FastAPI."""
     try:
-        response = requests.post(f"{FASTAPI_URL}/balance/add_funds", json={"email": email, "amount": amount})
+        response = requests.post(f"{FASTAPI_URL}/balance/update_balance", json={"email": email, "amount": amount})
         response.raise_for_status()
         data = response.json()
         return data["new_balance"]
@@ -90,6 +90,17 @@ def get_prediction(email, f1 , f2 , f3 , f4 , f5 ):
         st.error(f"Ошибка при получении предсказания: {e} - {response.text if 'response' in locals() else ''}")
         return None
     
+
+def get_prediction_history( email ):
+    
+    try:
+        response = requests.post(f"{FASTAPI_URL}/user/predictions", json={"email": email}) 
+        data = response.json()
+        return data["predictions"] 
+    
+    except requests.exceptions.RequestException as e:
+        st.error(f"Ошибка при получении истории предсказаний: {e} - {response.text if 'response' in locals() else ''}")
+        return None
 
 def show_login_form():
     """Отображает форму логина/регистрации."""
@@ -124,8 +135,32 @@ def main():
         st.session_state["email"] = None
 
     if st.session_state["authenticated"]:
+
         email = st.session_state["email"]  
         st.write(f"## Добро пожаловать, {email}!")
+
+        with st.sidebar:
+
+            def show_history():
+
+                st.subheader("История предсказаний")
+                
+                history_placeholder = st.empty()
+                history = get_prediction_history(email)
+                if history:
+                    df = pd.DataFrame(history)
+                    history_placeholder.dataframe(df)
+                else:
+                    history_placeholder.write("История предсказаний пуста.")
+
+                
+            show_history()
+
+            if st.button("Обновить"):
+                st.rerun()
+                
+
+
 
         balance = get_user_balance(email)
         if balance is not None:
@@ -159,6 +194,7 @@ def main():
                 )
 
                 new_balance = update_balance(email, -5)
+                
                 if new_balance is not None:
                     prediction = get_prediction(email, prediction_input.feature1 , prediction_input.feature2 , prediction_input.feature3 , prediction_input.feature4 , prediction_input.feature5 )
                     
@@ -170,6 +206,8 @@ def main():
                         st.error("Не удалось получить предсказание.")
                 else:
                     st.error("Не удалось списать средства с баланса.")
+
+                st.rerun()
 
         elif balance is not None:
             st.warning(f"Недостаточно средств на балансе.  Требуется 5 ед. для получения предсказания.")

@@ -30,9 +30,11 @@ class BalanceUpdate(BaseModel):
     
 
 
-@balance_route.post('/add_funds')
-async def update_balance( data : BalanceUpdate, session=Depends(get_session)) -> dict:
-    user = UserService.get_user_by_email(data.email, session=session)
+@balance_route.post('/update_balance')
+async def update_balance(data : BalanceUpdate, session =  Depends(get_session)) -> Dict:
+    """Обновляет баланс пользователя."""
+
+    user: User = UserService.get_user_by_email(data.email, session=session)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User is not exist")
 
@@ -41,7 +43,7 @@ async def update_balance( data : BalanceUpdate, session=Depends(get_session)) ->
     updated_user = UserService.update_balance(user, new_balance, session=session)
 
     if not updated_user:
-        
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail="Failed to update balance in database")
+
     return {"message": "Balance was changed", "new_balance": updated_user.balance}

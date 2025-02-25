@@ -14,3 +14,9 @@ numpy
 scikit-learn
 toml
 streamlit
+api-analytics==1.1.0
+sqlalchemy
+psycopg
+pika
+requests
+python-dotenv

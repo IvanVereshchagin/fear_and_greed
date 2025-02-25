@@ -1,5 +1,8 @@
 from models.user import User 
 from typing import List, Optional
+import sqlalchemy.exc as alc_errors
+from psycopg import errors as pg_errors
+
 
 def get_all_users(session) -> List[User]:
     return session.query(User).all()
@@ -15,9 +18,15 @@ def get_user_by_email(email: str, session) -> Optional[User]:
     return None
 
 def insert_user(new_user: User, session) -> None:
-    session.add(new_user)
-    session.commit()
-    session.refresh(new_user)
+    try:
+        session.add(new_user)
+        session.commit()
+        session.refresh(new_user)
+    
+    except alc_errors.IntegrityError as e:
+        pass
+    except pg_errors.UniqueViolation as e: 
+        pass
 
 
 def update_balance(user: User, new_balance: float, session) -> Optional[User]:

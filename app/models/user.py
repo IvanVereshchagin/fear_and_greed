@@ -16,9 +16,10 @@ class User(SQLModel, table=True):
     password: str
     user_id: Optional[int] = Field(default=None, primary_key=True)
     username: str
-    email: str
+    email: str = Field( unique= True , index = True , nullable = False )
     balance : float
     role : UserRole
+
 
 
     def add_funds(self, amount: float) -> None:
