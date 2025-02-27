@@ -7,6 +7,9 @@ from typing import Optional, List
 
 
 class Transaction(SQLModel, table=True):
+    #__tablename__ = 'transaction'
+    __table_args__ = {'extend_existing': True}
+
     transaction_id:  Optional[int] = Field(default=None, primary_key=True, index=True) 
     user_id: int 
     amount: float

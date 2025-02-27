@@ -5,19 +5,15 @@ class Publisher:
         import os 
 
         
-        rabbitmq_host = os.environ.get('RABBITMQ_HOST', 'localhost')
-        rabbitmq_user = os.environ.get('RABBITMQ_USER', 'rmuser')
-        rabbitmq_pass = os.environ.get('RABBITMQ_PASSWORD', 'rmpassword')
-        exchange_name = 'ml_tasks'      
+        
 
 
         credentials = pika.PlainCredentials('rmuser', 'rmpassword')
         parameters = pika.ConnectionParameters( host = 'rabbitmq',
                                                 port = 5672 , 
                                                 virtual_host='/',
-                                                credentials=credentials,
-                                                heartbeat=30,
-                                                blocked_connection_timeout=2
+                                                credentials=credentials
+                                             
                                                 )
 
         connection = pika.BlockingConnection(parameters)

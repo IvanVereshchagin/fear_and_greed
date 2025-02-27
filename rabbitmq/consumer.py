@@ -5,10 +5,26 @@ import requests
 import threading
 import os
 import pika
+import joblib 
+from app.models.prediction import MarketSentiment , PredictionHistory
+from app.cruds import crud_user as UserService
+from app.cruds import crud_prediction as PredictionService
+import datetime 
+from  app.database.database import get_session
+import numpy as np
 
-rabbitmq_host = os.environ.get('RABBITMQ_HOST', 'localhost')
-rabbitmq_user = os.environ.get('RABBITMQ_USER', 'rmuser')
-rabbitmq_pass = os.environ.get('RABBITMQ_PASSWORD', 'rmpassword')
+import time 
+from app.database.config import get_settings
+from app.database.database import init_db
+import sqlalchemy
+
+from sqlmodel import SQLModel, Session, create_engine , Field
+from typing import Optional, List
+from app.database.database import engine
+
+from app.cruds.crud_prediction import get_all_predictions , insert_prediction , get_user_prediction , get_prediction_by_id
+
+
 exchange_name = 'ml_tasks'
 queue_name = 'test'
 
@@ -22,7 +38,7 @@ parameters = pika.ConnectionParameters(host='rabbitmq',
 
 def callback(ch, method, properties, body):
     try:
-        print(f"Получено сообщение с delivery_tag: {method.delivery_tag}")  # Добавлено логирование
+        print(f"Получено сообщение с delivery_tag: {method.delivery_tag}") 
 
         task_data = json.loads(body.decode('utf-8'))
 
@@ -36,12 +52,63 @@ def callback(ch, method, properties, body):
 
         
         try:
-            response = requests.post('http://app:8080/user/predict', json=task_data)
-            response.raise_for_status()
-            result = response.json()
-            print(f" [x] Получен ответ от ML сервиса: {result}")
 
-            print(f" [x] Задача выполнена. Результат сохранена.")
+            settings = get_settings()
+            time.sleep(4)
+            try:
+                init_db()
+            except sqlalchemy.exc.ProgrammingError as e : 
+                print(e)
+                pass
+
+            
+
+            
+            loaded_model = joblib.load("./app/regression_model.joblib")
+            feature_array = np.array([ i for i in task_data['prediction'].values() ])
+            predicted_index = loaded_model.predict(feature_array.reshape(1, -1))[0]
+
+            print('predicted index' , predicted_index)
+
+            if 0 <= predicted_index <= 10:
+                sentiment =  MarketSentiment.EXTREME_BEARISH
+            elif 11 <= predicted_index <= 20:
+                sentiment = MarketSentiment.RADICAL_BEARISH
+            elif 21 <= predicted_index <= 30:
+                sentiment = MarketSentiment.STRONG_BEARISH
+            elif 31 <= predicted_index <= 40:
+                sentiment = MarketSentiment.MODERATE_BEARISH
+            elif 41 <= predicted_index <= 60:
+                sentiment = MarketSentiment.NEUTRAL
+            elif 61 <= predicted_index <= 70:
+                sentiment = MarketSentiment.MODERATE_BULLISH
+            elif 71 <= predicted_index <= 80:
+                sentiment = MarketSentiment.STRONG_BULLISH
+            elif 81 <= predicted_index <= 90:
+                sentiment = MarketSentiment.RADICAL_BULLISH
+            elif 91 <= predicted_index <= 100:
+                sentiment = MarketSentiment.EXTREME_BULLISH
+            else:
+                
+                sentiment = MarketSentiment.EXTREME_BULLISH
+
+
+            pred_hist = PredictionHistory( user_id = task_data['user']['user_id'] , 
+                                        model_id= 1 , 
+                                        features = 'test' , 
+                                        prediction = predicted_index , 
+                                        category = sentiment ,
+                                        timestamp = datetime.datetime.now())
+            
+            with Session(engine) as session:
+                try:
+                    insert_prediction(pred_hist , session )
+                    
+                except:
+                    pass
+
+            
+            
 
             
             
@@ -55,6 +122,7 @@ def callback(ch, method, properties, body):
        
 def process_ml_task():
     try:
+        
         connection = pika.BlockingConnection(parameters)
         channel = connection.channel()
 
@@ -78,3 +146,4 @@ if __name__ == '__main__':
         print(f"Необработанное исключение в main: {e}", file=sys.stderr)
         sys.exit(1)
 
+        

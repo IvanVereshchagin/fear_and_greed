@@ -1,4 +1,4 @@
-from models.prediction import PredictionHistory
+from app.models.prediction import PredictionHistory
 from typing import List, Optional
 
 def get_all_predictions(session) -> List[PredictionHistory]:

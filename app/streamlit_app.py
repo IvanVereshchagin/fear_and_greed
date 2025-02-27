@@ -5,9 +5,9 @@ import os
 import json
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, status, Depends  , Body
-from  database.database import get_session
-from cruds import crud_user as UserService
-from database.config import get_settings
+from  app.database.database import get_session
+from app.cruds import crud_user as UserService
+from app.database.config import get_settings
 import pandas as pd 
 
 FASTAPI_URL = "http://app:8080"  

@@ -61,10 +61,14 @@ services:
         - app_network
 
   ml_worker:
-    build: ./rabbitmq  
+    build:
+      context: .  
+      dockerfile: rabbitmq.Dockerfile  
     restart: always 
     depends_on:
       - rabbitmq
+      - db
+      - app
     environment:
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_USER=rmuser
@@ -78,7 +82,7 @@ services:
   streamlit:  
     build:
       context: .  
-      dockerfile: app/streamlit.Dockerfile  
+      dockerfile: streamlit.Dockerfile  
     ports:
       - "8501:8501"
     depends_on:

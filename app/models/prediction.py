@@ -23,6 +23,9 @@ class MarketSentiment(Enum):
 
 
 class PredictionHistory(SQLModel, table=True):
+    #__tablename__ = 'prediction history'
+    __table_args__ = {'extend_existing': True}
+
     prediction_id : Optional[int] = Field(default=None, primary_key=True, index=True) 
     user_id : int
     model_id : int 

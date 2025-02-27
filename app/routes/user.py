@@ -128,42 +128,9 @@ async def predict(user : User, prediction : PredictionInput = Body(...), session
     
     Publisher.send_ml_task(task)
 
-    loaded_model = joblib.load("regression_model.joblib")
+    
 
-    predicted_index = loaded_model.predict(feature_array.reshape(1, -1))[0]
-
-    if 0 <= predicted_index <= 10:
-        sentiment =  MarketSentiment.EXTREME_BEARISH
-    elif 11 <= predicted_index <= 20:
-        sentiment = MarketSentiment.RADICAL_BEARISH
-    elif 21 <= predicted_index <= 30:
-        sentiment = MarketSentiment.STRONG_BEARISH
-    elif 31 <= predicted_index <= 40:
-        sentiment = MarketSentiment.MODERATE_BEARISH
-    elif 41 <= predicted_index <= 60:
-        sentiment = MarketSentiment.NEUTRAL
-    elif 61 <= predicted_index <= 70:
-        sentiment = MarketSentiment.MODERATE_BULLISH
-    elif 71 <= predicted_index <= 80:
-        sentiment = MarketSentiment.STRONG_BULLISH
-    elif 81 <= predicted_index <= 90:
-        sentiment = MarketSentiment.RADICAL_BULLISH
-    elif 91 <= predicted_index <= 100:
-        sentiment = MarketSentiment.EXTREME_BULLISH
-    else:
-        #raise ValueError("Предсказано неверное значение")
-        sentiment = MarketSentiment.EXTREME_BULLISH
-
-    pred_hist = PredictionHistory( user_id = user.user_id , 
-                                  model_id= 1 , 
-                                  features = 'test' , 
-                                  prediction = predicted_index , 
-                                  category = sentiment ,
-                                   timestamp = datetime.datetime.now())
-
-    PredictionService.insert_prediction(pred_hist , session )
-
-    return {"user_id": user.user_id, "prediction": predicted_index }
+    return {"user_id": user.user_id, "message": 'Сообщение отправлено на обработку'}
 
 class EmailForm(BaseModel): 
     email: str

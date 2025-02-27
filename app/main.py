@@ -28,7 +28,7 @@ from routes.user import user_route
 from app.routes.balance import balance_route
 from fastapi.middleware.cors import CORSMiddleware
 from api_analytics.fastapi import Analytics 
-
+import sqlalchemy
 import uvicorn
 from fastapi import FastAPI
 
@@ -39,7 +39,12 @@ def initialize_database():
 
     time.sleep(40)
 
-    init_db()
+    try:
+        init_db()
+    except sqlalchemy.exc.ProgrammingError as e : 
+        print(e)
+        pass
+
 
     admin = User(password='test' , username = 'vova', email='admin@mail.ru', balance = 0 , role = UserRole.ADMIN  )
     user = User(password='test2' , username = 'katya', email='user@mail.ru', balance = 0 , role =  UserRole.USER)

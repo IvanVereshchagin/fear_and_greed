@@ -1,4 +1,4 @@
-from models.transaction import Transaction
+from app.models.transaction import Transaction
 from typing import List, Optional
 
 def get_all_transactions(session) -> List[Transaction]:

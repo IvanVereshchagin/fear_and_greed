@@ -1,4 +1,4 @@
-from models.model import Model
+from app.models.model import Model
 from typing import List, Optional
 
 def get_all_models(session) -> List[Model]:

@@ -1,4 +1,4 @@
-from models.user import User 
+from app.models.user import User 
 from typing import List, Optional
 import sqlalchemy.exc as alc_errors
 from psycopg import errors as pg_errors

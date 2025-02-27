@@ -1,4 +1,4 @@
-from models.ml_task import MLTask
+from app.models.ml_task import MLTask
 from typing import List, Optional
 
 def get_all_ml_tasks(session) -> List[MLTask]:
